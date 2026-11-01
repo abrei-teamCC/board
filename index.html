@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ABREI Board</title>
+<meta name="theme-color" content="#0a0c11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ABREI Board">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  html,body{margin:0;height:100%;background:#0a0c11;overflow:hidden}
+  #f{position:fixed;top:env(safe-area-inset-top);left:0;right:0;bottom:0;width:100%;height:calc(100% - env(safe-area-inset-top));border:0;background:#0a0c11}
+  #s{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#e9edf3;font:600 18px -apple-system,Segoe UI,Roboto,sans-serif;transition:opacity .4s}
+  #s img{width:96px;height:96px;border-radius:22px}
+  #s small{color:#8b93a5;font-weight:400}
+</style>
+</head>
+<body>
+<div id="s"><img src="icon-192.png" alt=""><div>ABREI Agents Board</div><small>Loading…</small></div>
+<iframe id="f" src="https://script.google.com/macros/s/AKfycbzD3fRQohpu1_lU2WydYqmCnoU83g93cmfsXOOPQnEI9jO9rbCJVHpGytiUNOaof3O3gA/exec" allow="clipboard-write" title="ABREI Agents Board"></iframe>
+<script>
+  document.getElementById('f').addEventListener('load', function () { var s = document.getElementById('s'); s.style.opacity = 0; setTimeout(function () { s.remove(); }, 450); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>
