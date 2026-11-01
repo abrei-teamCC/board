@@ -13,19 +13,75 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
-  html,body{margin:0;height:100%;background:#0a0c11;overflow:hidden}
+  html,body{margin:0;height:100%;background:#0a0c11;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
   #f{position:fixed;top:env(safe-area-inset-top);left:0;right:0;bottom:0;width:100%;height:calc(100% - env(safe-area-inset-top));border:0;background:#0a0c11}
-  #s{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#e9edf3;font:600 18px -apple-system,Segoe UI,Roboto,sans-serif;transition:opacity .4s}
+  #s{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#e9edf3;font-weight:600;font-size:18px;transition:opacity .4s;z-index:5}
   #s img{width:96px;height:96px;border-radius:22px}
   #s small{color:#8b93a5;font-weight:400}
+  #bell{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));z-index:9;display:none;align-items:center;gap:10px;background:#4f8cff;color:#fff;border:0;border-radius:999px;padding:13px 20px;font-size:16px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:pointer;max-width:92vw}
+  #bell.ok{background:#2fbf8f}
+  #bell .x{opacity:.8;font-weight:400;margin-left:6px}
 </style>
 </head>
 <body>
 <div id="s"><img src="icon-192.png" alt=""><div>ABREI Agents Board</div><small>Loading…</small></div>
 <iframe id="f" src="https://script.google.com/macros/s/AKfycbzD3fRQohpu1_lU2WydYqmCnoU83g93cmfsXOOPQnEI9jO9rbCJVHpGytiUNOaof3O3gA/exec" allow="clipboard-write" title="ABREI Agents Board"></iframe>
+<button id="bell" type="button"></button>
+<script src="fb.js"></script>
 <script>
-  document.getElementById('f').addEventListener('load', function () { var s = document.getElementById('s'); s.style.opacity = 0; setTimeout(function () { s.remove(); }, 450); });
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+var EXEC = 'https://script.google.com/macros/s/AKfycbzD3fRQohpu1_lU2WydYqmCnoU83g93cmfsXOOPQnEI9jO9rbCJVHpGytiUNOaof3O3gA/exec';
+var SESSION = null, REG = null, MSG = null;
+function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+document.getElementById('f').addEventListener('load', function () { var s = document.getElementById('s'); s.style.opacity = 0; setTimeout(function () { s.remove(); }, 450); });
+
+function loadScript(src) { return new Promise(function (ok, no) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+var canPush = ('serviceWorker' in navigator) && ('Notification' in window) && ('PushManager' in window);
+
+if ('serviceWorker' in navigator) REG = navigator.serviceWorker.register('sw.js').then(function () { return navigator.serviceWorker.ready; }).catch(function () { return null; });
+
+function fbReady() {
+  if (MSG) return Promise.resolve(MSG);
+  return loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-app-compat.js')
+    .then(function () { return loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-messaging-compat.js'); })
+    .then(function () { if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG); MSG = firebase.messaging();
+      MSG.onMessage(function (p) { var n = p.notification || {}; REG.then(function (r) { if (r) r.showNotification(n.title || 'ABREI', { body: n.body || '', icon: 'icon-192.png', badge: 'icon-192.png' }); }); });
+      return MSG; });
+}
+function register(silent) {
+  if (!SESSION || !canPush) return Promise.resolve(false);
+  return Promise.all([fbReady(), REG]).then(function (a) {
+    return a[0].getToken({ vapidKey: FB_VAPID, serviceWorkerRegistration: a[1] }); })
+  .then(function (tok) {
+    if (!tok) throw new Error('no token');
+    return fetch(EXEC, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tok: SESSION.tok, fcm: tok, ua: navigator.userAgent }) })
+      .then(function () { ls('push_' + SESSION.agent, String(Date.now())); return true; });
+  }).catch(function (e) { if (!silent) alert('Could not turn on notifications: ' + (e && e.message || e)); return false; });
+}
+function bell() {
+  var b = document.getElementById('bell');
+  if (!SESSION || SESSION.role === 'admin') { b.style.display = 'none'; return; }
+  if (!canPush) {
+    if (isIOS && !standalone && !ls('ios_hint')) { b.innerHTML = '📲 Add to Home Screen to get notifications <span class="x">✕</span>'; b.className = ''; b.style.display = 'flex';
+      b.onclick = function () { ls('ios_hint', '1'); b.style.display = 'none'; alert('On iPhone: tap the Share button ⬆️ in Safari, then "Add to Home Screen". Open the ABREI app from your home screen and tap "Turn on notifications".'); }; }
+    return; }
+  if (Notification.permission === 'granted') {
+    var last = +ls('push_' + SESSION.agent) || 0; if (Date.now() - last > 864e5) register(true); b.style.display = 'none'; return; }
+  if (Notification.permission === 'denied') { b.style.display = 'none'; return; }
+  b.innerHTML = '🔔 Turn on notifications'; b.className = ''; b.style.display = 'flex';
+  b.onclick = function () {
+    b.innerHTML = 'Turning on…';
+    Notification.requestPermission().then(function (p) {
+      if (p !== 'granted') { b.style.display = 'none'; return; }
+      register(false).then(function (ok) { if (ok) { b.innerHTML = '✓ Notifications on'; b.className = 'ok'; setTimeout(function () { b.style.display = 'none'; }, 2500); } else b.innerHTML = '🔔 Turn on notifications'; });
+    });
+  };
+}
+window.addEventListener('message', function (e) {
+  if (!/\.googleusercontent\.com$/.test(new URL(e.origin).hostname)) return;
+  var d = e.data || {}; if (d.abrei !== 'session' || !d.tok) return;
+  SESSION = { tok: d.tok, agent: d.agent, role: d.role }; bell();
+});
 </script>
 </body>
 </html>
